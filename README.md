@@ -7,7 +7,7 @@ $> cd lib/multi-party-sig-cmp && go mod download # multi-party-sig-cmp 依赖安
 $> cd ../.. && go mod download # cmp依赖安装
 ```
 
-在文件夹中已经生成了三个钱包`w1.kgc,w2.kgc,w3.kgc`，可以直接使用。也可以通过`create`来生成新的钱包。
+在文件夹中已经生成了三个钱包`w1.kgc,w2.kgc,w3.kgc`，可以直接使用，地址是`0x41351a1f66808ee630b73a01f68d11eb639bf0f9`。也可以通过`create`来生成新的钱包。
 
 ## 命令
 
@@ -16,7 +16,7 @@ $> cd ../.. && go mod download # cmp依赖安装
 接下来打开多个终端，分别代表不同的钱包。
 
 - 创建钱包
-  - go run main.go create -w <wallet_path> -i <party_id> -s <parties> -t <threshold>
+  - go run main.go create -w <wallet_path> -i <party_id> -s <party_ids> -t <threshold>
   - 比如 `go run main.go create -w w1.kgc -i 1 -s 1,2,3 -t 3`
 - 转账
   - go run main.go transfer -w <wallet_path> -d <dist_address>
