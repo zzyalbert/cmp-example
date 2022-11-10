@@ -22,6 +22,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/spf13/cobra"
+	"github.com/taurusgroup/multi-party-sig/pkg/ecdsa"
 	"github.com/taurusgroup/multi-party-sig/pkg/math/curve"
 	"github.com/taurusgroup/multi-party-sig/pkg/pool"
 	"github.com/taurusgroup/multi-party-sig/protocols/cmp/config"
@@ -97,28 +98,37 @@ var transferCmd = &cobra.Command{
 		hash := txSigner.Hash(tx)
 		message := hash.Bytes()
 		log.Printf("message %s", hash.Hex())
-		// 得到R S
-		signature, err := core.CMPSign(keygenConfig, message, signers, n, pl)
-		if err != nil {
-			core.FailOnErr(err, "")
-		}
-		log.Printf("ID:%s CMPSign ok %+v", string(id), signature)
 
-		xPoint := (signature.R).(*curve.Secp256k1Point)
-		xBytes = xPoint.XBytes()
-		sBytes, err := signature.S.MarshalBinary()
-
-		var (
-			secp256k1N, _  = new(big.Int).SetString("fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141", 16)
-			secp256k1halfN = new(big.Int).Div(secp256k1N, big.NewInt(2))
-		)
-
+		var sBytes []byte
+		var xPoint *curve.Secp256k1Point
+		var signature *ecdsa.Signature
 		s := &big.Int{}
-		s.SetBytes(sBytes)
-		if s.Cmp(secp256k1halfN) == 1 {
-			s = s.Sub(s, secp256k1halfN)
-			log.Printf("S>half N")
+
+		// 得到R S
+		for {
+			signature, err = core.CMPSign(keygenConfig, message, signers, n, pl)
+			if err != nil {
+				core.FailOnErr(err, "")
+			}
+			log.Printf("ID:%s CMPSign ok %+v", string(id), signature)
+
+			xPoint = (signature.R).(*curve.Secp256k1Point)
+			xBytes = xPoint.XBytes()
+			sBytes, err = signature.S.MarshalBinary()
+
+			var (
+				secp256k1N, _  = new(big.Int).SetString("fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141", 16)
+				secp256k1halfN = new(big.Int).Div(secp256k1N, big.NewInt(2))
+			)
+
+			s.SetBytes(sBytes)
+			if s.Cmp(secp256k1halfN) == 1 {
+				log.Printf("S>half N")
+				continue
+			}
+			break
 		}
+
 		sBytes = s.Bytes()
 
 		log.Printf("r hex:%s", hex.EncodeToString(xBytes))
