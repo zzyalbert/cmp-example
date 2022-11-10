@@ -82,8 +82,10 @@ var transferCmd = &cobra.Command{
 		txSigner := types.NewLondonSigner(big.NewInt(chainId))
 		amount := unit.NewEther(big.NewFloat(0.01))
 		gasLimit := uint64(22000)
-		gasPrice, err := client.SuggestGasPrice(context.Background())
-		core.FailOnErr(err, "get gasprice fail")
+		// gasPrice, err := client.SuggestGasPrice(context.Background())
+		// log.Printf("gas price %d", gasPrice.Int64())
+		// core.FailOnErr(err, "get gasprice fail")
+		gasPrice := big.NewInt(66083460)
 		gasPrice = gasPrice.Mul(gasPrice, big.NewInt(5)).Div(gasPrice, big.NewInt(4))
 		core.FailOnErr(err, "fail to get gas price")
 		nonce, err := client.PendingNonceAt(context.Background(), address)
@@ -106,8 +108,21 @@ var transferCmd = &cobra.Command{
 		xBytes = xPoint.XBytes()
 		sBytes, err := signature.S.MarshalBinary()
 
-		log.Printf("hex:%s", hex.EncodeToString(xBytes))
-		log.Printf("hex:%s", hex.EncodeToString(sBytes))
+		var (
+			secp256k1N, _  = new(big.Int).SetString("fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141", 16)
+			secp256k1halfN = new(big.Int).Div(secp256k1N, big.NewInt(2))
+		)
+
+		s := &big.Int{}
+		s.SetBytes(sBytes)
+		if s.Cmp(secp256k1halfN) == 1 {
+			s = s.Sub(s, secp256k1halfN)
+			log.Printf("S>half N")
+		}
+		sBytes = s.Bytes()
+
+		log.Printf("r hex:%s", hex.EncodeToString(xBytes))
+		log.Printf("s hex:%s", hex.EncodeToString(sBytes))
 
 		yBytes = signature.R.(*curve.Secp256k1Point).YBytes()
 		var v int64 = 0
