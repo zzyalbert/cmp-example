@@ -105,28 +105,25 @@ var transferCmd = &cobra.Command{
 		s := &big.Int{}
 
 		// 得到R S
-		for {
-			signature, err = core.CMPSign(keygenConfig, message, signers, n, pl)
-			if err != nil {
-				core.FailOnErr(err, "")
-			}
-			log.Printf("ID:%s CMPSign ok %+v", string(id), signature)
+		signature, err = core.CMPSign(keygenConfig, message, signers, n, pl)
+		if err != nil {
+			core.FailOnErr(err, "")
+		}
+		log.Printf("ID:%s CMPSign ok %+v", string(id), signature)
 
-			xPoint = (signature.R).(*curve.Secp256k1Point)
-			xBytes = xPoint.XBytes()
-			sBytes, err = signature.S.MarshalBinary()
+		xPoint = (signature.R).(*curve.Secp256k1Point)
+		xBytes = xPoint.XBytes()
+		sBytes, err = signature.S.MarshalBinary()
 
-			var (
-				secp256k1N, _  = new(big.Int).SetString("fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141", 16)
-				secp256k1halfN = new(big.Int).Div(secp256k1N, big.NewInt(2))
-			)
+		var (
+			secp256k1N, _  = new(big.Int).SetString("fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141", 16)
+			secp256k1halfN = new(big.Int).Div(secp256k1N, big.NewInt(2))
+		)
 
-			s.SetBytes(sBytes)
-			if s.Cmp(secp256k1halfN) == 1 {
-				log.Printf("S>half N")
-				continue
-			}
-			break
+		s.SetBytes(sBytes)
+		if s.Cmp(secp256k1halfN) == 1 {
+			log.Printf("S>half N")
+			s = secp256k1N.Sub(secp256k1N, s)
 		}
 
 		sBytes = s.Bytes()
