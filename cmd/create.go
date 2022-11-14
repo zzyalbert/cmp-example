@@ -10,13 +10,14 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/0x1be20/cmp-example/src/client"
+	"github.com/0x1be20/cmp-example/src/communication"
 	"github.com/0x1be20/cmp-example/src/core"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
 	"github.com/spf13/cobra"
 	"github.com/taurusgroup/multi-party-sig/pkg/math/curve"
 	"github.com/taurusgroup/multi-party-sig/pkg/party"
-	"github.com/taurusgroup/multi-party-sig/pkg/pool"
 )
 
 var id string
@@ -40,14 +41,20 @@ var createCmd = &cobra.Command{
 			partyIds = append(partyIds, party.ID(p))
 		}
 		parties := party.NewIDSlice(partyIds)
-		n := core.NewWSeNetwork(string(partyId))
-		n.Init()
-		pl := pool.NewPool(0)
-		defer pl.TearDown()
 
+		n := communication.NewWSeNetwork(string(partyId))
+
+		n.Init("localhost:8080", "/ws")
+
+		c := client.NewClient(partyId, n)
+
+		//等待一会
 		time.Sleep(time.Second * 10)
 
-		keygenConfig, err := core.CMPKeygen(partyId, parties, int(threshold), n, pl)
+		keygenConfig, err := c.Keygen(parties, int(threshold))
+		if err != nil {
+			core.FailOnErr(err, "")
+		}
 		bytes, err := keygenConfig.MarshalBinary()
 		ioutil.WriteFile(wallet, bytes, 0777)
 		if err != nil {
