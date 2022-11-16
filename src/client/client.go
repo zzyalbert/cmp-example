@@ -6,6 +6,7 @@ import (
 	"log"
 	"math/big"
 
+	cmpcommon "github.com/0x1be20/cmp-example/src/common"
 	"github.com/0x1be20/cmp-example/src/communication"
 	"github.com/0x1be20/cmp-example/src/sdk"
 	"github.com/ethereum/go-ethereum/common"
@@ -15,12 +16,13 @@ import (
 	"github.com/taurusgroup/multi-party-sig/pkg/math/curve"
 	"github.com/taurusgroup/multi-party-sig/pkg/party"
 	"github.com/taurusgroup/multi-party-sig/pkg/pool"
+	"github.com/taurusgroup/multi-party-sig/pkg/protocol"
 	"github.com/taurusgroup/multi-party-sig/protocols/cmp"
 	"github.com/taurusgroup/multi-party-sig/protocols/cmp/config"
 )
 
 type Client struct {
-	N       communication.ProtocolNetwork
+	n       communication.ProtocolNetwork
 	ID      party.ID
 	config  *cmp.Config
 	Address common.Address
@@ -28,7 +30,7 @@ type Client struct {
 
 func NewClient(partyId party.ID, network communication.ProtocolNetwork) *Client {
 	return &Client{
-		N:  network,
+		n:  network,
 		ID: partyId,
 	}
 }
@@ -65,10 +67,29 @@ func (c *Client) Load(wallet string) {
 	log.Printf("address:%s", address.Hex())
 }
 
-func (c *Client) Keygen(ids party.IDSlice, threshold int) (*cmp.Config, error) {
+func (c *Client) AddNetwork(n communication.ProtocolNetwork) {
+	c.n = n
+}
+
+func (c *Client) Register(session string) {
+	msg := cmpcommon.Message{
+		Type:      cmpcommon.MesgTypeRegister,
+		SessionId: session,
+		ExtraData: []byte(c.ID),
+		Data:      &protocol.Message{},
+	}
+	c.Network().Send(&msg)
+	log.Printf("register done")
+}
+
+func (c *Client) Network() communication.ProtocolNetwork {
+	return c.n
+}
+
+func (c *Client) Keygen(ids party.IDSlice, threshold int, reqeustId string) (*cmp.Config, error) {
 	pl := pool.NewPool(0)
 	defer pl.TearDown()
-	result, _, err := sdk.CMPKeygen(c.ID, ids, threshold, c.N, pl)
+	result, _, err := sdk.CMPKeygen(c.ID, ids, threshold, c.Network(), pl, reqeustId)
 	if err != nil {
 		log.Printf("keygen failed,%+v", err)
 		return nil, err
@@ -78,11 +99,11 @@ func (c *Client) Keygen(ids party.IDSlice, threshold int) (*cmp.Config, error) {
 	return config, nil
 }
 
-func (c *Client) Sign(m []byte) (*ecdsa.Signature, error) {
+func (c *Client) Sign(m []byte, requestId string) (*ecdsa.Signature, error) {
 	pl := pool.NewPool(0)
 	defer pl.TearDown()
 	signers := c.config.PartyIDs()
-	result, _, err := sdk.CMPSign(c.config, m, signers, c.N, pl)
+	result, _, err := sdk.CMPSign(c.config, m, signers, c.Network(), pl, requestId)
 	if err != nil {
 		log.Printf("sign failed,%+v", err)
 		return nil, err

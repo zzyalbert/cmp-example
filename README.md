@@ -21,3 +21,8 @@ $> cd ../.. && go mod download # cmp依赖安装
 - 转账
   - go run main.go transfer -w <wallet_path> -d <dist_address>
   - 比如 `go run main.go -w w1.kgc` ，会有一个默认目标地址,`0x921B004dc386ba15604bB97205Bb20988192DEDf`
+
+## 架构
+
+![arch](assets/arch.png)
+

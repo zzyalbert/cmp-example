@@ -12,27 +12,31 @@ import (
 )
 
 type ProtocolNetwork interface {
-	Send(msg *protocol.Message)
+	Send(msg *common.Message)
 	Quit(id party.ID)
 	Done(id party.ID) chan struct{}
-	Next() chan *protocol.Message
+	Next() chan *common.Message
 }
 
 type WSNetwork struct {
+	sessionId  string
 	partyID    string
 	done       chan struct{}
 	mtx        sync.Mutex
-	inChannel  chan *protocol.Message
-	outChannel chan *protocol.Message
+	inChannel  chan *common.Message
+	outChannel chan *common.Message
+	handler    func(*common.Message)
 }
 
-func NewWSeNetwork(partyID string) *WSNetwork {
+func NewWSeNetwork(sessionId, partyID string, handler func(*common.Message)) *WSNetwork {
 	c := &WSNetwork{
+		sessionId:  sessionId,
 		partyID:    partyID,
 		done:       make(chan struct{}, 10),
 		mtx:        sync.Mutex{},
-		inChannel:  make(chan *protocol.Message, 1000),
-		outChannel: make(chan *protocol.Message, 1000),
+		inChannel:  make(chan *common.Message, 1000),
+		outChannel: make(chan *common.Message, 1000),
+		handler:    handler,
 	}
 	return c
 }
@@ -58,12 +62,18 @@ func (n *WSNetwork) Init(addr string, path string) {
 				return
 			}
 			protocolMsg := &common.Message{
+				Type:      "common",
 				SessionId: "",
-				ExtraData: "",
+				ExtraData: []byte{},
 				Data:      &protocol.Message{},
 			}
 			protocolMsg.UnmarshalBinary(message)
-			n.inChannel <- protocolMsg.Data
+			if protocolMsg.Type == common.MesgTypeProtocol {
+				n.handler(protocolMsg)
+				n.inChannel <- protocolMsg
+			} else {
+				n.handler(protocolMsg)
+			}
 		}
 
 	}()
@@ -75,13 +85,8 @@ func (n *WSNetwork) Init(addr string, path string) {
 			case <-n.done:
 				return
 			case msg := <-n.outChannel:
-				outMesg := &common.Message{
-					SessionId: "",
-					ExtraData: "",
-					Data:      msg,
-				}
 
-				msgBytes, _ := outMesg.MarshalBinary()
+				msgBytes, _ := msg.MarshalBinary()
 				err := c.WriteMessage(websocket.BinaryMessage, msgBytes)
 				if err != nil {
 					log.Println("write failed", err)
@@ -91,9 +96,11 @@ func (n *WSNetwork) Init(addr string, path string) {
 		}
 
 	}()
+
 }
 
-func (n *WSNetwork) Send(msg *protocol.Message) {
+func (n *WSNetwork) Send(msg *common.Message) {
+	msg.SessionId = n.sessionId
 	n.outChannel <- msg
 }
 
@@ -109,6 +116,6 @@ func (n *WSNetwork) Done(id party.ID) chan struct{} {
 	return n.done
 }
 
-func (n *WSNetwork) Next() chan *protocol.Message {
+func (n *WSNetwork) Next() chan *common.Message {
 	return n.inChannel
 }

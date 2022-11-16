@@ -3,6 +3,7 @@ package sdk
 import (
 	"log"
 
+	"github.com/0x1be20/cmp-example/src/common"
 	"github.com/0x1be20/cmp-example/src/communication"
 	"github.com/taurusgroup/multi-party-sig/pkg/ecdsa"
 	"github.com/taurusgroup/multi-party-sig/pkg/math/curve"
@@ -15,7 +16,7 @@ import (
 // 该package简化使用CMP协议
 //
 
-func handleProtocol(h *protocol.MultiHandler, n communication.ProtocolNetwork, done chan int, stop chan int) {
+func handleProtocol(h *protocol.MultiHandler, n communication.ProtocolNetwork, done chan int, stop chan int, requestId string) {
 	go func() {
 		defer close(done)
 		defer close(stop)
@@ -26,9 +27,18 @@ func handleProtocol(h *protocol.MultiHandler, n communication.ProtocolNetwork, d
 					done <- 1
 					return
 				}
-				go n.Send(msg)
+				cmsg := &common.Message{
+					Type:      "protocol",
+					SessionId: "",
+					RequestId: requestId,
+					ExtraData: []byte{},
+					Data:      msg,
+				}
+				go n.Send(cmsg)
 			case msg := <-n.Next():
-				h.Accept(msg)
+				if msg.Type == "protocol" {
+					h.Accept(msg.Data)
+				}
 			case _ = <-stop:
 				return
 			}
@@ -37,7 +47,7 @@ func handleProtocol(h *protocol.MultiHandler, n communication.ProtocolNetwork, d
 
 }
 
-func CMPKeygen(id party.ID, ids party.IDSlice, threshold int, n communication.ProtocolNetwork, pl *pool.Pool) (chan interface{}, chan int, error) {
+func CMPKeygen(id party.ID, ids party.IDSlice, threshold int, n communication.ProtocolNetwork, pl *pool.Pool, requestId string) (chan interface{}, chan int, error) {
 	h, err := protocol.NewMultiHandler(cmp.Keygen(curve.Secp256k1{}, id, ids, threshold, pl), nil)
 	done := make(chan int, 100)
 	stop := make(chan int, 100)
@@ -46,7 +56,7 @@ func CMPKeygen(id party.ID, ids party.IDSlice, threshold int, n communication.Pr
 		return result, stop, err
 	}
 
-	go handleProtocol(h, n, done, stop)
+	go handleProtocol(h, n, done, stop, requestId)
 	go func() {
 		defer close(result)
 		<-done
@@ -59,7 +69,7 @@ func CMPKeygen(id party.ID, ids party.IDSlice, threshold int, n communication.Pr
 	return result, stop, nil
 }
 
-func CMPSign(c *cmp.Config, m []byte, signers party.IDSlice, n communication.ProtocolNetwork, pl *pool.Pool) (chan interface{}, chan int, error) {
+func CMPSign(c *cmp.Config, m []byte, signers party.IDSlice, n communication.ProtocolNetwork, pl *pool.Pool, requestId string) (chan interface{}, chan int, error) {
 	h, err := protocol.NewMultiHandler(cmp.Sign(c, signers, m, pl), nil)
 	result := make(chan interface{}, 100)
 	done := make(chan int, 100)
@@ -68,7 +78,7 @@ func CMPSign(c *cmp.Config, m []byte, signers party.IDSlice, n communication.Pro
 		return result, stop, err
 	}
 
-	go handleProtocol(h, n, done, stop)
+	go handleProtocol(h, n, done, stop, requestId)
 
 	go func() {
 		defer close(result)

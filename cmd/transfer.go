@@ -13,13 +13,13 @@ import (
 	"time"
 
 	"github.com/0x1be20/cmp-example/src/client"
+	cmpcommon "github.com/0x1be20/cmp-example/src/common"
 	"github.com/0x1be20/cmp-example/src/communication"
 	"github.com/0x1be20/cmp-example/src/core"
 	unit "github.com/DeOne4eg/eth-unit-converter"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/spf13/cobra"
 	"github.com/taurusgroup/multi-party-sig/pkg/ecdsa"
 	"github.com/taurusgroup/multi-party-sig/pkg/math/curve"
@@ -50,7 +50,6 @@ func buildUnsignedTx(address common.Address) (*types.Transaction, []byte) {
 
 	// nonce
 	nonce, err := client.PendingNonceAt(context.Background(), address)
-	log.Printf("nonce %d", nonce)
 	core.FailOnErr(err, "fail to get nonce")
 
 	// message
@@ -83,7 +82,6 @@ func buildSignedTx(signature *ecdsa.Signature, tx *types.Transaction, address co
 
 	s.SetBytes(sBytes)
 	if s.Cmp(secp256k1halfN) == 1 {
-		log.Printf("S>half N")
 		s = secp256k1N.Sub(secp256k1N, s)
 	}
 
@@ -95,8 +93,6 @@ func buildSignedTx(signature *ecdsa.Signature, tx *types.Transaction, address co
 	var v int64 = 0
 	// 得到V
 	for _, v = range []int64{0, 1} {
-		log.Printf("===============================\n\n\n")
-		log.Printf("v=%d", v)
 		rawSignature := fmt.Sprintf("%s%s", hex.EncodeToString(xBytes),
 			hex.EncodeToString(sBytes),
 		)
@@ -105,26 +101,19 @@ func buildSignedTx(signature *ecdsa.Signature, tx *types.Transaction, address co
 		} else {
 			rawSignature += "01"
 		}
-		log.Printf("tx rawsignature %s", rawSignature)
 		signatureHex, err := hex.DecodeString(rawSignature)
 		core.FailOnErr(err, "signature hex failed")
 		signedTx, err := tx.WithSignature(signer, signatureHex)
 		core.FailOnErr(err, "sign tx failed")
 
-		tv, tr, ts := signedTx.RawSignatureValues()
-		log.Printf("\ntxv %s  \ntxr %s \ntxs %s", hex.EncodeToString(tv.Bytes()), hex.EncodeToString(tr.Bytes()), hex.EncodeToString(ts.Bytes()))
-
-		rawTxBytes, _ := rlp.EncodeToBytes(signedTx)
-		rawTxHex := hex.EncodeToString(rawTxBytes)
-		fmt.Printf("raw tx hex  %s\n", rawTxHex)
-		fmt.Printf("tx hash %s\n", signedTx.Hash().Hex())
 		msg, err := signedTx.AsMessage(types.NewLondonSigner(signedTx.ChainId()), nil)
 		if err != nil {
 			log.Printf("tx as mesg fail %+v", err)
 			continue
 		}
-		fmt.Printf("tx from:%s\n", msg.From().Hex())
 		if msg.From().Hex() == address.Hex() {
+			fmt.Printf("tx hash %s\n", signedTx.Hash().Hex())
+			fmt.Printf("tx from:%s\n", msg.From().Hex())
 			return signedTx
 		}
 
@@ -148,15 +137,19 @@ var transferCmd = &cobra.Command{
 		c.Load(wallet)
 
 		id := c.ID
-		n := communication.NewWSeNetwork(string(id))
+		n := communication.NewWSeNetwork(sessionId, string(id), func(m *cmpcommon.Message) {
+
+		})
 		n.Init("localhost:8080", "/ws")
-		c.N = n
+		c.AddNetwork(n)
+
+		c.Register(sessionId)
 
 		time.Sleep(time.Second * 10)
 
 		tx, message := buildUnsignedTx(c.Address)
 
-		signature, err := c.Sign(message)
+		signature, err := c.Sign(message, "")
 		if err != nil {
 			core.FailOnErr(err, "")
 		}

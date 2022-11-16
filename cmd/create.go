@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/0x1be20/cmp-example/src/client"
+	"github.com/0x1be20/cmp-example/src/common"
 	"github.com/0x1be20/cmp-example/src/communication"
 	"github.com/0x1be20/cmp-example/src/core"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -42,7 +43,7 @@ var createCmd = &cobra.Command{
 		}
 		parties := party.NewIDSlice(partyIds)
 
-		n := communication.NewWSeNetwork(string(partyId))
+		n := communication.NewWSeNetwork(sessionId, string(partyId), func(m *common.Message) {})
 
 		n.Init("localhost:8080", "/ws")
 
@@ -51,7 +52,7 @@ var createCmd = &cobra.Command{
 		//等待一会
 		time.Sleep(time.Second * 10)
 
-		keygenConfig, err := c.Keygen(parties, int(threshold))
+		keygenConfig, err := c.Keygen(parties, int(threshold), "")
 		if err != nil {
 			core.FailOnErr(err, "")
 		}
