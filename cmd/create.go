@@ -48,6 +48,7 @@ var createCmd = &cobra.Command{
 		n.Init("localhost:8080", "/ws")
 
 		c := client.NewClient(partyId, n)
+		c.Register(sessionId)
 
 		//等待一会
 		time.Sleep(time.Second * 10)

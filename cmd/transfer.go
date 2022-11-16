@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"log"
 	"math/big"
-	"time"
 
 	"github.com/0x1be20/cmp-example/src/client"
 	cmpcommon "github.com/0x1be20/cmp-example/src/common"
@@ -20,9 +19,9 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/google/uuid"
 	"github.com/spf13/cobra"
-	"github.com/taurusgroup/multi-party-sig/pkg/ecdsa"
-	"github.com/taurusgroup/multi-party-sig/pkg/math/curve"
+	"github.com/taurusgroup/multi-party-sig/pkg/protocol"
 )
 
 var dist string
@@ -63,17 +62,17 @@ func buildUnsignedTx(address common.Address) (*types.Transaction, []byte) {
 	return tx, message
 }
 
-func buildSignedTx(signature *ecdsa.Signature, tx *types.Transaction, address common.Address) *types.Transaction {
+func buildSignedTx(xBytes []byte, sBytes []byte, tx *types.Transaction, address common.Address) *types.Transaction {
 
 	signer := txSigner()
 
-	var sBytes []byte
-	var xPoint *curve.Secp256k1Point
+	// var sBytes []byte
+	// var xPoint *curve.Secp256k1Point
 	s := &big.Int{}
 
-	xPoint = (signature.R).(*curve.Secp256k1Point)
-	xBytes := xPoint.XBytes()
-	sBytes, _ = signature.S.MarshalBinary()
+	// xPoint = (signature.R).(*curve.Secp256k1Point)
+	// xBytes := xPoint.XBytes()
+	// sBytes, _ = signature.S.MarshalBinary()
 
 	var (
 		secp256k1N, _  = new(big.Int).SetString("fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141", 16)
@@ -131,6 +130,8 @@ var transferCmd = &cobra.Command{
 		log.Printf("dist address %s", dist)
 		log.Printf("wallet %s", wallet)
 
+		signatureChan := make(chan *cmpcommon.Signature, 1)
+
 		ethClient := txClient()
 
 		c := &client.Client{}
@@ -138,30 +139,50 @@ var transferCmd = &cobra.Command{
 
 		id := c.ID
 		n := communication.NewWSeNetwork(sessionId, string(id), func(m *cmpcommon.Message) {
+			log.Printf("got message type %s", m.Type)
+			if m.Type == cmpcommon.MesgTypeSignResult {
+				signature := &cmpcommon.Signature{}
+				err := signature.Unmarshal(m.ExtraData)
+				if err != nil {
+					log.Printf("extra signature fail %+v", err)
+				}
 
+				log.Printf("got sign result %s %s", hex.EncodeToString(signature.S), hex.EncodeToString(signature.X))
+				signatureChan <- signature
+
+			}
 		})
 		n.Init("localhost:8080", "/ws")
 		c.AddNetwork(n)
 
-		c.Register(sessionId)
+		// c.Register(sessionId)
 
-		time.Sleep(time.Second * 10)
+		// time.Sleep(time.Second * 10)
 
 		tx, message := buildUnsignedTx(c.Address)
 
-		signature, err := c.Sign(message, "")
-		if err != nil {
-			core.FailOnErr(err, "")
+		mesg := &cmpcommon.Message{
+			Type:      cmpcommon.MesgTypeReqSign,
+			SessionId: sessionId,
+			MesgId:    0,
+			RequestId: uuid.NewString(),
+			ExtraData: message,
+			Data:      &protocol.Message{},
 		}
-		log.Printf("ID:%s CMPSign ok %+v", string(id), signature)
+		n.Send(mesg)
 
-		signedTx := buildSignedTx(signature, tx, c.Address)
+		signature := <-signatureChan
 
-		if send {
-			err = ethClient.SendTransaction(context.Background(), signedTx)
-			core.FailOnErr(err, "send tx failed")
-			fmt.Printf("tx sent:%s", signedTx.Hash().Hex())
-		}
+		// signature, err := c.Sign(message, "")
+		// if err != nil {
+		// 	core.FailOnErr(err, "")
+		// }
+		// log.Printf("ID:%s CMPSign ok %+v", string(id), signature)
+
+		signedTx := buildSignedTx(signature.X, signature.S, tx, c.Address)
+		err := ethClient.SendTransaction(context.Background(), signedTx)
+		core.FailOnErr(err, "send tx failed")
+		fmt.Printf("tx sent:%s", signedTx.Hash().Hex())
 	},
 }
 
