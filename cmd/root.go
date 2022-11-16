@@ -12,6 +12,7 @@ import (
 
 // wallet path
 var wallet string
+var sessionId string
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -47,5 +48,6 @@ func init() {
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
 	rootCmd.PersistentFlags().StringVarP(&wallet, "wallet", "w", "wallet.kgc", "wallet path")
+	rootCmd.PersistentFlags().StringVarP(&sessionId, "session", "", "session", "session id")
 
 }

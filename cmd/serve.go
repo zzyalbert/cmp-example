@@ -7,7 +7,7 @@ package cmd
 import (
 	"log"
 
-	"github.com/0x1be20/cmp-example/src/core"
+	"github.com/0x1be20/cmp-example/src/server"
 	"github.com/spf13/cobra"
 )
 
@@ -18,7 +18,7 @@ var serveCmd = &cobra.Command{
 	Long:  `setup a message server`,
 	Run: func(cmd *cobra.Command, args []string) {
 		log.Printf("run as server")
-		core.InitServer()
+		server.InitServer("127.0.0.1", 8080, "/ws")
 	},
 }
 
