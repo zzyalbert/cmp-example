@@ -19,6 +19,11 @@ var upgrader = websocket.Upgrader{
 } // use default options
 var channels = map[string]map[string]*websocket.Conn{}
 var clients = map[string]*websocket.Conn{} // requestid=>connect
+
+var serveNode = &websocket.Conn{}
+var auditorNode = &websocket.Conn{}
+var userNodes = make(map[string]*websocket.Conn)
+
 var chLocker = sync.Mutex{}
 
 var locker = sync.Mutex{}
@@ -56,21 +61,19 @@ func connect(w http.ResponseWriter, r *http.Request) {
 
 		// router
 		if protocolMesg.Type == common.MesgTypeRegister {
-			chLocker.Lock()
-			if _, ok := channels[sessionId]; ok {
-				delete(channels[sessionId], id)
-			}
-			chLocker.Unlock()
-
 			sessionId = protocolMesg.SessionId
 
-			log.Printf("register node,session:%s id:%s", sessionId, id)
-			if _, ok := channels[sessionId]; !ok {
-				channels[sessionId] = make(map[string]*websocket.Conn)
-				channels[sessionId][id] = c
+			if protocolMesg.NodeType == common.NodeTypeServer {
+				serveNode = c
+			} else if protocolMesg.NodeType == common.NodeTypeAuditor {
+				auditorNode = c
 			} else {
-				channels[sessionId][id] = c
+				// user node
+				userNodes[sessionId] = c
 			}
+
+			log.Printf("register %s node,session:%s id:%s", protocolMesg.NodeType, sessionId, id)
+
 			locker.Unlock()
 			continue
 		} else if protocolMesg.Type == common.MesgTypeReqSign {
@@ -90,20 +93,24 @@ func connect(w http.ResponseWriter, r *http.Request) {
 
 			continue
 		}
-
-		log.Printf("session %s,recv msg, from %s,to %s round %v", sessionId, protocolMesg.Data.From, protocolMesg.Data.To, protocolMesg.Data.RoundNumber)
 		sessionId = protocolMesg.SessionId
+		log.Printf("session %s,recv msg, from %s,to %s round %v", sessionId, protocolMesg.Data.From, protocolMesg.Data.To, protocolMesg.Data.RoundNumber)
 
-		chLocker.Lock()
-
-		for _, conn := range channels[sessionId] {
-			err = conn.WriteMessage(mt, message)
-			if err != nil {
-				log.Println("write:", err)
-				break
-			}
+		err = serveNode.WriteMessage(mt, message)
+		if err != nil {
+			log.Printf("server node err,%+v", err)
 		}
-		chLocker.Unlock()
+
+		err = auditorNode.WriteMessage(mt, message)
+		if err != nil {
+			log.Printf("auditor node err ,%+v", err)
+		}
+
+		err = userNodes[sessionId].WriteMessage(mt, message)
+		if err != nil {
+			log.Printf("user node err,%+v", err)
+		}
+
 		locker.Unlock()
 	}
 }

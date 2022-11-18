@@ -32,7 +32,7 @@ to quickly create a Cobra application.`,
 
 		stop := make(chan int, 1)
 
-		n := communication.NewWSeNetwork(sessionId, string(id), func(m *common.Message) {
+		n := communication.NewWSeNetwork(sessionId, func(m *common.Message) {
 			log.Printf("got message type %s", m.Type)
 			if m.Type == common.MesgTypeSignResult {
 				signature := &common.Signature{}
@@ -60,7 +60,7 @@ to quickly create a Cobra application.`,
 		}
 		n.Send(mesg)
 		<-stop
-		n.Done(party.ID(id))
+		n.Done(party.ID("user"))
 
 	},
 }

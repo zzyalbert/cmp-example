@@ -7,6 +7,7 @@ import (
 
 type Message struct {
 	Type      MesgType
+	NodeType  NodeType
 	SessionId string
 	MesgId    int64
 	RequestId string
@@ -16,6 +17,7 @@ type Message struct {
 
 type marshallableMessage struct {
 	Type      string
+	NodeType  string
 	SessionId string
 	MesgId    int64
 	RequestId string
@@ -27,6 +29,7 @@ func (m *Message) toMarshallable() *marshallableMessage {
 	protocolData, _ := m.Data.MarshalBinary()
 	return &marshallableMessage{
 		Type:      string(m.Type),
+		NodeType:  string(m.NodeType),
 		SessionId: m.SessionId,
 		MesgId:    m.MesgId,
 		RequestId: m.RequestId,
@@ -50,18 +53,29 @@ func (m *Message) UnmarshalBinary(data []byte) error {
 	m.Type = MesgType(deserialized.Type)
 	m.RequestId = deserialized.RequestId
 	m.MesgId = deserialized.MesgId
+	m.NodeType = NodeType(deserialized.NodeType)
 	return nil
 }
 
 type MesgType string
 
 const (
-	MesgTypeRegister   MesgType = "register"
-	MesgTypeProtocol   MesgType = "protocol"
-	MesgTypeCommon     MesgType = "common"
-	MesgTypeSign       MesgType = "sign"
-	MesgTypeSignResult MesgType = "result_sign"
-	MesgTypeReqSign    MesgType = "req_sign"
+	MesgTypeRegister     MesgType = "register"
+	MesgTypeProtocol     MesgType = "protocol"
+	MesgTypeCommon       MesgType = "common"
+	MesgTypeSign         MesgType = "sign"
+	MesgTypeSignResult   MesgType = "result_sign"
+	MesgTypeReqSign      MesgType = "req_sign"
+	MesgTypeUserRegister MesgType = "user_register"
+	MesgTypeWalletCreate MesgType = "wallet_create"
+)
+
+type NodeType string
+
+const (
+	NodeTypeUser    NodeType = "user"
+	NodeTypeServer  NodeType = "server"
+	NodeTypeAuditor NodeType = "auditor"
 )
 
 func (this MesgType) String() string {

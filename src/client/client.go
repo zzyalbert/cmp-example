@@ -71,9 +71,10 @@ func (c *Client) AddNetwork(n communication.ProtocolNetwork) {
 	c.n = n
 }
 
-func (c *Client) Register(session string) {
+func (c *Client) Register(session string, nodeType cmpcommon.NodeType) {
 	msg := cmpcommon.Message{
 		Type:      cmpcommon.MesgTypeRegister,
+		NodeType:  nodeType,
 		SessionId: session,
 		ExtraData: []byte(c.ID),
 		Data:      &protocol.Message{},
@@ -86,10 +87,10 @@ func (c *Client) Network() communication.ProtocolNetwork {
 	return c.n
 }
 
-func (c *Client) Keygen(ids party.IDSlice, threshold int, reqeustId string) (*cmp.Config, error) {
+func (c *Client) Keygen(ids party.IDSlice, threshold int, reqeustId string, sessionId string) (*cmp.Config, error) {
 	pl := pool.NewPool(0)
 	defer pl.TearDown()
-	result, _, err := sdk.CMPKeygen(c.ID, ids, threshold, c.Network(), pl, reqeustId)
+	result, _, err := sdk.CMPKeygen(c.ID, ids, threshold, c.Network(), pl, reqeustId, sessionId)
 	if err != nil {
 		log.Printf("keygen failed,%+v", err)
 		return nil, err
@@ -99,11 +100,11 @@ func (c *Client) Keygen(ids party.IDSlice, threshold int, reqeustId string) (*cm
 	return config, nil
 }
 
-func (c *Client) Sign(m []byte, requestId string) (*ecdsa.Signature, error) {
+func (c *Client) Sign(m []byte, requestId string, sessionId string) (*ecdsa.Signature, error) {
 	pl := pool.NewPool(0)
 	defer pl.TearDown()
 	signers := c.config.PartyIDs()
-	result, _, err := sdk.CMPSign(c.config, m, signers, c.Network(), pl, requestId)
+	result, _, err := sdk.CMPSign(c.config, m, signers, c.Network(), pl, requestId, sessionId)
 	if err != nil {
 		log.Printf("sign failed,%+v", err)
 		return nil, err

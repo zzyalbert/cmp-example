@@ -137,8 +137,7 @@ var transferCmd = &cobra.Command{
 		c := &client.Client{}
 		c.Load(wallet)
 
-		id := c.ID
-		n := communication.NewWSeNetwork(sessionId, string(id), func(m *cmpcommon.Message) {
+		n := communication.NewWSeNetwork(sessionId, func(m *cmpcommon.Message) {
 			log.Printf("got message type %s", m.Type)
 			if m.Type == cmpcommon.MesgTypeSignResult {
 				signature := &cmpcommon.Signature{}

@@ -20,7 +20,6 @@ type ProtocolNetwork interface {
 
 type WSNetwork struct {
 	sessionId  string
-	partyID    string
 	done       chan struct{}
 	mtx        sync.Mutex
 	inChannel  chan *common.Message
@@ -28,10 +27,9 @@ type WSNetwork struct {
 	handler    func(*common.Message)
 }
 
-func NewWSeNetwork(sessionId, partyID string, handler func(*common.Message)) *WSNetwork {
+func NewWSeNetwork(sessionId string, handler func(*common.Message)) *WSNetwork {
 	c := &WSNetwork{
 		sessionId:  sessionId,
-		partyID:    partyID,
 		done:       make(chan struct{}, 10),
 		mtx:        sync.Mutex{},
 		inChannel:  make(chan *common.Message, 1000),
@@ -100,7 +98,6 @@ func (n *WSNetwork) Init(addr string, path string) {
 }
 
 func (n *WSNetwork) Send(msg *common.Message) {
-	msg.SessionId = n.sessionId
 	n.outChannel <- msg
 }
 
